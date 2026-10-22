@@ -6,7 +6,7 @@ Twice-daily GitHub Actions release check and conditional Android AAR build from 
 
 - Automatic: **04:04 and 12:12 Asia/Seoul every day**, including weekends. GitHub cron schedules are in UTC: `4 19 * * *` (04:04 KST the next day) and `12 3 * * *` (12:12 KST the same day).
 - Each scheduled run performs a version check first; builds do **not** run if the upstream version is already published as a successful AAR GitHub Release.
-- Manual: Actions -> Build wiserain/rclone Android AAR -> Run workflow. Enter an optional upstream release_tag; an already successfully built version is skipped even for manual runs.
+- Manual: Actions -> Build wiserain/rclone Android AAR -> Run workflow. Supply an optional upstream release_tag; builds of an already-published tag are skipped unless force=true.
 - On source updates: a push to main touching the build scripts or workflow **rebuilds** the current upstream release with new ckReader bindings; the twice-daily scheduled runs still skip successfully published versions.
 - Source checkout: immutable commit SHA resolved from the published release tag.
 - Android: gomobile bind -target=android, minimum API 23, four ABI variants. The build injects ckReader's Go bindings before gomobile.
