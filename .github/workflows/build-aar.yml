@@ -17,7 +17,12 @@ on:
     - cron: '12 3 * * *' # 12:12 KST
   push:
     branches: [main]
-    paths: ['.github/workflows/build-aar.yml', 'scripts/**']
+    paths:
+      - .github/workflows/build-aar.yml
+      - scripts/build-aar.sh
+      - scripts/resolve-release.sh
+      - scripts/ckreader_range.go
+      - scripts/verify-aar.py
 permissions:
   contents: read
 concurrency:
