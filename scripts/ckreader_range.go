@@ -26,7 +26,8 @@ func RcloneStatSize(fsrc, remote string) (int64, error) {
 // RcloneReadRange returns at most 2 MiB from the requested object.
 // The remote backend must honor the rclone range option for true random access.
 func RcloneReadRange(fsrc, remote string, offset int64, count int) ([]byte, error) {
-	if offset < 0 || count < 1 || count > 2*1024*1024 {
+	if offset < 0 || count < 1 || count > 2*1024*1024 ||
+		offset > (1<<63-1)-int64(count) {
 		return nil, fmt.Errorf("invalid offset or byte count")
 	}
 	ctx := context.Background()
@@ -42,7 +43,7 @@ func RcloneReadRange(fsrc, remote string, offset int64, count int) ([]byte, erro
 	if size >= 0 && offset >= size {
 		return []byte{}, nil
 	}
-	// The size comparison above also avoids end-overflow for known-size objects.
+	// Request only the indicated range, never more than the 2 MiB cap.
 	reader, err := object.Open(ctx, &fs.RangeOption{
 		Start: offset,
 		End:   offset + int64(count) - 1,
