@@ -35,23 +35,24 @@ gomobile bind -v -target=android -androidapi 23 -javapkg=org.rclone \
 unzip -tq "$output"
 unzip -Z1 "$output" > dist/AAR_CONTENTS.txt
 grep -Fxq classes.jar dist/AAR_CONTENTS.txt
-for abi in armeabi-v7a arm64-v8a x86 x86_64; do
-  grep -Fxq "jni/$abi/libgojni.so" dist/AAR_CONTENTS.txt || {
-    echo "::error::AAR missing libgojni.so for $abi"
-    exit 1
-  }
-done
-# Fail the build (and block upload/publish) if any ABI, JNI method, or ELF
-# PT_LOAD segment fails 16 KiB compatibility checks.
+# Only ARM64 is a required compatibility target. Other architectures may
+# still be present in the AAR but do not block publishing when unverified.
+grep -Fxq "jni/arm64-v8a/libgojni.so" dist/AAR_CONTENTS.txt || {
+  echo "::error::AAR missing arm64-v8a/libgojni.so"
+  exit 1
+}
+# Fail the build (and block upload/publish) if the ARM64 ELF/JNI compatibility
+# gate fails. Java API method/signature checks are shared across all ABIs.
 python3 ../builder/scripts/verify-aar.py "$output" dist/AAR_VERIFICATION.json
 
 (cd dist && sha256sum "$(basename "$output")" > SHA256SUMS && sha256sum -c SHA256SUMS)
-printf 'upstream=wiserain/rclone\ntag=%s\ncommit=%s\nbindings=ckreader-stat-range\npage_alignment=16384\n' \
+printf 'upstream=wiserain/rclone\ntag=%s\ncommit=%s\nbindings=ckreader-stat-range\npage_alignment=16384\nverification_abi=arm64-v8a\n' \
   "$RELEASE_TAG" "$RELEASE_SHA" > dist/BUILD_INFO.txt
 {
   echo "## ckReader-compatible Android AAR"
   echo "- Upstream version: $RELEASE_TAG"
   echo "- Source commit: $RELEASE_SHA"
-  echo "- JNI and 16 KiB ELF checks: PASS (4 ABIs)"
+  echo "- JNI and 16 KiB ELF checks: PASS (arm64-v8a only)"
+  echo "- Other ABIs: not compatibility-verified"
   cat dist/SHA256SUMS
 } >> "$GITHUB_STEP_SUMMARY"
