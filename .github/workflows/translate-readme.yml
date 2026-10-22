@@ -41,7 +41,7 @@ jobs:
           fenced = False
           unknown = []
           for line in Path("README.md").read_text(encoding="utf-8").splitlines():
-              if line.strip().startswith(("\\x60\\x60\\x60", "~~~")):
+              if line.strip().startswith(("```", "~~~")):
                   fenced = not fenced
                   continue
               if not fenced and line.strip() and line not in overrides and not line.lstrip().startswith("<!--"):
