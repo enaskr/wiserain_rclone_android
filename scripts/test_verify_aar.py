@@ -49,6 +49,32 @@ class Test16KiBAlignment(unittest.TestCase):
             with self.subTest(abi=abi), self.assertRaises(ValueError):
                 VERIFIER.verify_elf_alignment(make_elf(abi, address=4096), abi)
 
+    def test_accept_static_jni_exports(self):
+        exports = [
+            "Java_org_rclone_gomobile_Gomobile_" + method
+            for method in VERIFIER.REQUIRED_METHODS
+        ]
+        symbols = "\n".join(
+            f"100: 00000000 0 FUNC GLOBAL DEFAULT 12 {name}"
+            for name in exports
+        )
+        result = VERIFIER.inspect_jni_exports(symbols, "arm64-v8a")
+        self.assertEqual(result["mode"], "named_jni_exports")
+        self.assertEqual(len(result["exports"]), len(VERIFIER.REQUIRED_METHODS))
+
+    def test_accept_registration_via_jni_onload(self):
+        result = VERIFIER.inspect_jni_exports(
+            "2: 00000000 0 FUNC GLOBAL DEFAULT 12 JNI_OnLoad", "arm64-v8a"
+        )
+        self.assertEqual(result["mode"], "JNI_OnLoad")
+
+    def test_missing_jni_export_rejected(self):
+        with self.assertRaises(ValueError):
+            VERIFIER.inspect_jni_exports(
+                "1: 00000000 0 FUNC GLOBAL DEFAULT 12 Java_test_rcloneRPC",
+                "x86_64",
+            )
+
     def test_reject_elf_machine_mismatch(self):
         for abi in VERIFIER.ABI_ELF:
             with self.subTest(abi=abi), self.assertRaises(ValueError):
