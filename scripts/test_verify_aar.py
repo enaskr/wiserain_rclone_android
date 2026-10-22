@@ -47,17 +47,15 @@ class Test16KiBAlignment(unittest.TestCase):
                 out.writestr("classes.jar", b"mock JAR, javap covered separately")
                 out.writestr("jni/arm64-v8a/libgojni.so", make_elf("arm64-v8a"))
                 out.writestr("metadata.txt", b"0" * 2048)
-            with (
-                mock.patch.object(
-                    VERIFIER, "verify_java_bindings",
-                    return_value=list(VERIFIER.REQUIRED_METHODS),
-                ),
-                mock.patch.object(
+            with mock.patch.object(
+                VERIFIER, "verify_java_bindings",
+                return_value=list(VERIFIER.REQUIRED_METHODS),
+            ):
+                with mock.patch.object(
                     VERIFIER, "verify_jni_loader",
                     return_value={"mode": "named_jni_exports", "exports": []},
                 ) as native:
-            ):
-                report = VERIFIER.verify_aar(aar)
+                    report = VERIFIER.verify_aar(aar)
             self.assertEqual(report["verified_abis"], ["arm64-v8a"])
             self.assertEqual(list(report["abis"]), ["arm64-v8a"])
             native.assert_called_once()
