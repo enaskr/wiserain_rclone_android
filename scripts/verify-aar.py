@@ -105,15 +105,35 @@ def verify_java_bindings(jar_bytes: bytes, tmp: pathlib.Path) -> list[str]:
     return sorted(methods)
 
 
-def verify_jni_loader(data: bytes, abi: str, tmp: pathlib.Path) -> None:
+def inspect_jni_exports(readelf_output: str, abi: str) -> dict:
+    """Accept Android JNI registration via JNI_OnLoad or named Java_* entrypoints."""
+    exported = set(re.findall(r"\b(?:JNI_OnLoad|Java_[A-Za-z0-9_]+)\b", readelf_output))
+    if "JNI_OnLoad" in exported:
+        return {"mode": "JNI_OnLoad", "exports": ["JNI_OnLoad"]}
+    named = sorted(symbol for symbol in exported if symbol.startswith("Java_"))
+    missing = [
+        method for method in REQUIRED_METHODS
+        if not any(method in symbol for symbol in named)
+    ]
+    if missing:
+        raise ValueError(
+            f"{abi}: required native JNI exports missing: {', '.join(missing)}; "
+            f"found: {', '.join(named[:20]) or '(none)'}"
+        )
+    return {"mode": "named_jni_exports", "exports": [
+        next(symbol for symbol in named if method in symbol)
+        for method in REQUIRED_METHODS
+    ]}
+
+
+def verify_jni_loader(data: bytes, abi: str, tmp: pathlib.Path) -> dict:
     path = tmp / f"{abi}.so"
     path.write_bytes(data)
     output = subprocess.run(
         ["readelf", "-W", "--dyn-syms", str(path)],
         check=True, text=True, capture_output=True,
     ).stdout
-    if not re.search(r"\bJNI_OnLoad\b", output):
-        raise ValueError(f"{abi}: exported JNI_OnLoad is missing")
+    return inspect_jni_exports(output, abi)
 
 
 def verify_aar(path: pathlib.Path, report_path: pathlib.Path | None = None) -> dict:
@@ -131,14 +151,14 @@ def verify_aar(path: pathlib.Path, report_path: pathlib.Path | None = None) -> d
                 entry = f"jni/{abi}/libgojni.so"
                 native = aar.read(entry)
                 alignments = verify_elf_alignment(native, abi)
-                verify_jni_loader(native, abi, tmp)
+                jni = verify_jni_loader(native, abi, tmp)
                 report["abis"][abi] = {
                     "jni_lib": entry,
                     "bytes": len(native),
                     "pt_load_alignment": alignments,
-                    "jni_onload": True,
+                    "jni": jni,
                 }
-                print(f"{abi}: 16 KiB PT_LOAD alignment OK, JNI_OnLoad exported, segments={alignments}")
+                print(f"{abi}: 16 KiB PT_LOAD alignment OK, JNI mode={jni['mode']}, segments={alignments}")
     print(f"Java bindings: {', '.join(report['java_methods'])}")
     if report_path:
         report_path.parent.mkdir(parents=True, exist_ok=True)

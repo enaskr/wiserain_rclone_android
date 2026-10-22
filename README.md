@@ -14,7 +14,7 @@ Twice-daily GitHub Actions release check and conditional Android AAR build from 
 - Skip unchanged: scheduled runs compare the upstream release tag with the last successfully published AAR version. A GitHub Release only counts as successful if it contains an `.aar` asset. A manual run may override this with `force=true` to replace the existing release assets.
 - Retry failures: failed or interrupted builds create no successful AAR Release; the next scheduled run will retry the same upstream version.
 - Upstream/repository API errors abort version checking rather than triggering an unnecessary build.
-- Publishing: only after successful build, checksums, JNI method signatures, `JNI_OnLoad` loader symbols, and **16 KiB ELF PT_LOAD alignment for all four ABIs** have been verified.
+- Publishing: only after successful build, checksums, JNI method signatures, JNI native entry points (`JNI_OnLoad` or named `Java_*` exports), and **16 KiB ELF PT_LOAD alignment for all four ABIs** have been verified.
 - ckReader bindings: `scripts/ckreader_range.go` is copied into the temporary upstream checkout before `gomobile bind`, exporting `rcloneStatSize` and `rcloneReadRange` without modifying the upstream repository.
 - Range reads: `rcloneReadRange(fsrc, remote, offset, count)` returns at most 2 MiB per call, and the backend must support ranged reads to avoid downloading the full file.
 - For an already-published release, use **Actions → Run workflow** with the desired `release_tag` and `force=true`. Successful validation is required before its assets are replaced.
