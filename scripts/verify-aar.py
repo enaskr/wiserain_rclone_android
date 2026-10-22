@@ -131,7 +131,8 @@ def verify_jni_loader(data: bytes, abi: str, tmp: pathlib.Path) -> dict:
     path.write_bytes(data)
     output = subprocess.run(
         ["readelf", "-W", "--dyn-syms", str(path)],
-        check=True, text=True, capture_output=True,
+        check=True, text=True, encoding="utf-8", errors="replace",
+        capture_output=True,
     ).stdout
     return inspect_jni_exports(output, abi)
 
