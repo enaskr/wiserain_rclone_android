@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Fail closed unless every Android ABI has 16 KiB PT_LOAD alignment and ckReader JNI bindings."""
+"""Validate arm64-v8a ELF 16 KiB alignment and ckReader JNI bindings.
+
+Other ABIs may be included by gomobile but are intentionally outside the
+compatibility gate. Do not claim that they have passed validation.
+"""
 
 from __future__ import annotations
 
@@ -14,11 +18,10 @@ import tempfile
 import zipfile
 
 PAGE_SIZE = 16 * 1024
+# Only the ARM64 binary is a release-blocking compatibility target.
+# gomobile still produces its normal multi-ABI AAR.
 ABI_ELF = {
-    "armeabi-v7a": (1, 40),  # ELF32 / EM_ARM
-    "arm64-v8a": (2, 183),   # ELF64 / EM_AARCH64
-    "x86": (1, 3),           # ELF32 / EM_386
-    "x86_64": (2, 62),       # ELF64 / EM_X86_64
+    "arm64-v8a": (2, 183),  # ELF64 / EM_AARCH64
 }
 REQUIRED_METHODS = (
     "rcloneInitialize",
@@ -140,7 +143,12 @@ def verify_jni_loader(data: bytes, abi: str, tmp: pathlib.Path) -> dict:
 def verify_aar(path: pathlib.Path, report_path: pathlib.Path | None = None) -> dict:
     if not path.is_file() or path.stat().st_size < 1024:
         raise ValueError(f"Missing or empty AAR: {path}")
-    report = {"aar": path.name, "required_page_alignment": PAGE_SIZE, "abis": {}}
+    report = {
+        "aar": path.name,
+        "required_page_alignment": PAGE_SIZE,
+        "verified_abis": list(ABI_ELF),
+        "abis": {},
+    }
     with tempfile.TemporaryDirectory() as temp:
         tmp = pathlib.Path(temp)
         with zipfile.ZipFile(path) as aar:
@@ -161,6 +169,7 @@ def verify_aar(path: pathlib.Path, report_path: pathlib.Path | None = None) -> d
                 }
                 print(f"{abi}: 16 KiB PT_LOAD alignment OK, JNI mode={jni['mode']}, segments={alignments}")
     print(f"Java bindings: {', '.join(report['java_methods'])}")
+    print("Verification scope: arm64-v8a only (other ABIs are not compatibility-checked)")
     if report_path:
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
