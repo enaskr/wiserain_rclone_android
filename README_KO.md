@@ -1,4 +1,4 @@
-<!-- Auto-generated from README.md with Argos Translate. Source SHA-256: be30f504de3da08d284661edd81ccfe22deb953a9f25cff9f6c7aa33873baae2. -->
+<!-- Auto-generated from README.md with Argos Translate. Source SHA-256: 3eb1e3c5d0b81ec98cb7310b35ac8151088a6c80208f58e5a37b7de6f20fe1c1. -->
 
 # wiserain/rclone Android AAR 자동 빌더
 
@@ -11,12 +11,12 @@
 - **수동 실행**: Actions → Build wiserain/rclone Android AAR → Run workflow에서 필요 시 `release_tag`를 지정합니다. 이미 게시한 버전은 `force=true`를 지정하지 않으면 건너뜁니다.
 - **빌드 소스 변경 시**: 빌드 스크립트 또는 워크플로의 변경 사항이 `main`에 반영되면 새로운 ckReader 바인딩을 적용하기 위해 현재 원본 버전의 AAR을 **다시 빌드합니다**. 하루 두 번 실행되는 예약 작업은 기존 정상 배포 버전을 건너뜁니다.
 - **소스 추적성**: 배포 릴리스 태그를 원본 Git 커밋 SHA로 확인하고 해당 버전의 소스만 체크아웃합니다.
-- **Android 빌드**: `gomobile bind -target=android`를 사용하며 최소 API는 23입니다. 네 가지 ABI용 라이브러리를 생성하고 `gomobile` 실행 전에 ckReader 전용 Go 바인딩을 삽입합니다.
+- **Android 빌드**: `gomobile bind -target=android`를 사용하며 최소 API는 23입니다. 일반적으로 네 가지 ABI용 라이브러리를 생성하지만, **호환성 필수 검증은 `arm64-v8a`에만 적용**합니다. `gomobile` 실행 전에 ckReader 전용 Go 바인딩을 삽입합니다.
 - **산출물**: Android AAR, `SHA256SUMS`, `BUILD_INFO.txt`, `AAR_CONTENTS.txt`, `AAR_VERIFICATION.json`을 GitHub Actions Artifacts 및 GitHub Releases(`aar-<tag>`)에 보관합니다.
 - **중복 방지**: 예약 실행은 최신 원본 태그와 마지막 성공 배포 버전을 비교합니다. GitHub Release에 실제 `.aar` 파일이 있는 경우에만 성공한 배포로 인정합니다. `force=true`를 지정한 수동 실행은 기존 릴리스 파일을 교체할 수 있습니다.
 - **실패 후 재시도**: 실패하거나 중단된 빌드는 정상 배포로 기록되지 않으므로 다음 예약 실행에서 동일한 원본 버전을 다시 빌드합니다.
 - **API 오류 처리**: 원본 또는 GitHub API 조회에 실패하면 불필요한 빌드를 시작하지 않고 작업을 실패 처리합니다.
-- **배포 전 검증**: 컴파일 성공 여부, 체크섬, JNI 메서드 시그니처, JNI 네이티브 연결점(`JNI_OnLoad` 또는 이름이 지정된 `Java_*` 심볼), 네 가지 ABI 모두의 **16 KiB ELF `PT_LOAD` 정렬**을 확인합니다. 하나라도 실패하면 배포하지 않습니다.
+- **배포 전 검증**: 빌드 성공과 체크섬, 공통 Java JNI 메서드 시그니처를 확인하고, **`arm64-v8a`에 대해서만 네이티브 JNI 진입점 및 16 KiB ELF `PT_LOAD` 정렬**을 검사합니다. 다른 ABI가 AAR에 포함되더라도 호환성을 검증하지 않으며, 해당 ABI의 검증 오류는 배포를 차단하지 않습니다.
 - **ckReader 바인딩**: 빌드 전에 `scripts/ckreader_range.go`를 임시 체크아웃한 원본의 `librclone/gomobile` 폴더에 복사합니다. 따라서 원본 저장소를 수정하지 않고 `rcloneStatSize`와 `rcloneReadRange`를 노출합니다.
 - **범위 읽기**: `rcloneReadRange(fsrc, remote, offset, count)`는 한 번의 호출에 최대 2 MiB를 반환합니다. 파일 전체 다운로드를 피하려면 연결된 백엔드가 범위 읽기를 지원해야 합니다.
 - **기존 배포 파일 갱신**: Actions → Run workflow에서 원하는 `release_tag`와 `force=true`를 지정하세요. 모든 검증을 통과해야 기존 GitHub Release 자산을 교체합니다.
