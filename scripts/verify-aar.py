@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Fail closed unless every Android ABI has 16 KiB PT_LOAD alignment and ckReader JNI bindings."""
 
+from __future__ import annotations
+
 import io
 import json
 import pathlib
