@@ -1,0 +1,108 @@
+name: Build wiserain/rclone Android AAR
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Optional upstream release tag'
+        required: false
+        type: string
+      force:
+        description: 'Rebuild already published release'
+        type: boolean
+        default: false
+  schedule:
+    - cron: '17 3 * * *'
+  push:
+    branches: [main]
+    paths: ['.github/workflows/build-aar.yml', 'scripts/**']
+permissions:
+  contents: read
+concurrency:
+  group: wiserain-rclone-aar
+  cancel-in-progress: false
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      sha: ${{ steps.resolve.outputs.sha }}
+      build: ${{ steps.resolve.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve upstream release
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REQUESTED_TAG: ${{ inputs.release_tag }}
+          FORCE_BUILD: ${{ inputs.force }}
+        run: bash scripts/resolve-release.sh
+  build:
+    needs: resolve
+    if: needs.resolve.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: builder
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: wiserain/rclone
+          ref: ${{ needs.resolve.outputs.sha }}
+          path: rclone
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: rclone/go.mod
+          cache-dependency-path: rclone/go.sum
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android NDK
+        run: |
+          set -euo pipefail
+          sdkmanager --install 'platforms;android-35' 'ndk;27.2.12479018'
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> "$GITHUB_ENV"
+      - name: Build and verify AAR
+        working-directory: rclone
+        env:
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+          RELEASE_SHA: ${{ needs.resolve.outputs.sha }}
+        run: bash ../builder/scripts/build-aar.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rclone-${{ needs.resolve.outputs.tag }}-android-aar
+          path: rclone/dist/
+          retention-days: 30
+          if-no-files-found: error
+  publish:
+    needs: [resolve, build]
+    if: needs.resolve.outputs.build == 'true' && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: rclone-${{ needs.resolve.outputs.tag }}-android-aar
+          path: dist
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+          RELEASE_SHA: ${{ needs.resolve.outputs.sha }}
+        run: |
+          set -euo pipefail
+          release="aar-$RELEASE_TAG"
+          if gh release view "$release" >/dev/null 2>&1; then
+            echo "Already published $release" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          (cd dist && sha256sum -c SHA256SUMS)
+          gh release create "$release" dist/*.aar dist/SHA256SUMS dist/BUILD_INFO.txt dist/AAR_CONTENTS.txt             --title "Android AAR for wiserain/rclone $RELEASE_TAG"             --notes "Upstream: wiserain/rclone $RELEASE_TAG, commit $RELEASE_SHA"
