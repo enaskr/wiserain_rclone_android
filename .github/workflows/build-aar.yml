@@ -160,10 +160,10 @@ jobs:
               exit 0
             fi
             gh release upload "$release" "${files[@]}" --clobber
-            gh release edit "$release" --notes "Upstream: wiserain/rclone $RELEASE_TAG, commit $RELEASE_SHA. Rebuilt with ckReader stat/range JNI and 16 KiB ELF validation for all ABIs."
+            gh release edit "$release" --notes "Upstream: wiserain/rclone $RELEASE_TAG, commit $RELEASE_SHA. Rebuilt with ckReader stat/range JNI and 16 KiB ELF validation for arm64-v8a only; other ABIs unverified."
             echo "Replaced AAR assets in $release" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           gh release create "$release" "${files[@]}" \
             --title "Android AAR for wiserain/rclone $RELEASE_TAG" \
-            --notes "Upstream: wiserain/rclone $RELEASE_TAG, commit $RELEASE_SHA. Includes ckReader stat/range JNI and 16 KiB ELF validation."
+            --notes "Upstream: wiserain/rclone $RELEASE_TAG, commit $RELEASE_SHA. Includes ckReader stat/range JNI and 16 KiB ELF validation for arm64-v8a only."
