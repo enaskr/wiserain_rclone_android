@@ -1,4 +1,4 @@
-<!-- Auto-generated from README.md with Argos Translate. Source SHA-256: 9b160d4181526451ad9a10fb4782ec51d1da7202f029ccba84cd17c84184cdb4. -->
+<!-- Auto-generated from README.md with Argos Translate. Source SHA-256: be30f504de3da08d284661edd81ccfe22deb953a9f25cff9f6c7aa33873baae2. -->
 
 # wiserain/rclone Android AAR 자동 빌더
 
@@ -16,7 +16,7 @@
 - **중복 방지**: 예약 실행은 최신 원본 태그와 마지막 성공 배포 버전을 비교합니다. GitHub Release에 실제 `.aar` 파일이 있는 경우에만 성공한 배포로 인정합니다. `force=true`를 지정한 수동 실행은 기존 릴리스 파일을 교체할 수 있습니다.
 - **실패 후 재시도**: 실패하거나 중단된 빌드는 정상 배포로 기록되지 않으므로 다음 예약 실행에서 동일한 원본 버전을 다시 빌드합니다.
 - **API 오류 처리**: 원본 또는 GitHub API 조회에 실패하면 불필요한 빌드를 시작하지 않고 작업을 실패 처리합니다.
-- **배포 전 검증**: 컴파일 성공 여부, 체크섬, JNI 메서드 시그니처, `JNI_OnLoad` 심볼, 네 가지 ABI 모두의 **16 KiB ELF `PT_LOAD` 정렬**을 확인합니다. 하나라도 실패하면 배포하지 않습니다.
+- **배포 전 검증**: 컴파일 성공 여부, 체크섬, JNI 메서드 시그니처, JNI 네이티브 연결점(`JNI_OnLoad` 또는 이름이 지정된 `Java_*` 심볼), 네 가지 ABI 모두의 **16 KiB ELF `PT_LOAD` 정렬**을 확인합니다. 하나라도 실패하면 배포하지 않습니다.
 - **ckReader 바인딩**: 빌드 전에 `scripts/ckreader_range.go`를 임시 체크아웃한 원본의 `librclone/gomobile` 폴더에 복사합니다. 따라서 원본 저장소를 수정하지 않고 `rcloneStatSize`와 `rcloneReadRange`를 노출합니다.
 - **범위 읽기**: `rcloneReadRange(fsrc, remote, offset, count)`는 한 번의 호출에 최대 2 MiB를 반환합니다. 파일 전체 다운로드를 피하려면 연결된 백엔드가 범위 읽기를 지원해야 합니다.
 - **기존 배포 파일 갱신**: Actions → Run workflow에서 원하는 `release_tag`와 `force=true`를 지정하세요. 모든 검증을 통과해야 기존 GitHub Release 자산을 교체합니다.
