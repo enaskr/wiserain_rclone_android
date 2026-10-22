@@ -51,16 +51,30 @@ elif jq -e --arg wanted "aar-$tag" 'any(.[]; .tag_name == $wanted)' <<< "$succes
   reason="This upstream version already has a successful AAR release"
 fi
 
+# Scheduled checks never rebuild unchanged versions. Explicit manual force
+# and pushes of build-related source files can rebuild an existing version.
+force="${FORCE_BUILD:-false}"
+case "$force" in
+  true|false) ;;
+  *) echo "::error::Invalid FORCE_BUILD flag: $force"; exit 1 ;;
+esac
+if [[ "$force" == true ]]; then
+  build=true
+  reason="ckReader build-source update or explicit manual rebuild"
+fi
+
 {
   printf 'tag=%s\n' "$tag"
   printf 'sha=%s\n' "$sha"
   printf 'build=%s\n' "$build"
+  printf 'force=%s\n' "$force"
 } >> "$GITHUB_OUTPUT"
 {
   echo '## Upstream release version check'
   echo "- Latest/selected upstream version: $tag"
   echo "- Last successfully published version: ${previous_version:-none}"
   echo "- Build required: $build"
+  echo "- Forced rebuild: $force"
   echo "- Reason: $reason"
   echo "- Upstream commit: $sha"
 } >> "$GITHUB_STEP_SUMMARY"

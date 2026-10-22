@@ -6,13 +6,24 @@ on:
         description: 'Optional upstream release tag'
         required: false
         type: string
+      force:
+        description: 'Rebuild an already published release with updated ckReader bindings'
+        required: false
+        type: boolean
+        default: false
   # GitHub cron is UTC; Asia/Seoul (UTC+9) has no daylight saving time.
   schedule:
     - cron: '4 19 * * *' # 04:04 KST (next calendar day)
     - cron: '12 3 * * *' # 12:12 KST
   push:
     branches: [main]
-    paths: ['.github/workflows/build-aar.yml', 'scripts/**']
+    paths:
+      - .github/workflows/build-aar.yml
+      - scripts/build-aar.sh
+      - scripts/resolve-release.sh
+      - scripts/ckreader_range.go
+      - scripts/verify-aar.py
+      - scripts/test_verify_aar.py
 permissions:
   contents: read
 concurrency:
@@ -25,6 +36,7 @@ jobs:
       tag: ${{ steps.resolve.outputs.tag }}
       sha: ${{ steps.resolve.outputs.sha }}
       build: ${{ steps.resolve.outputs.build }}
+      force: ${{ steps.resolve.outputs.force }}
     steps:
       - uses: actions/checkout@v4
       - name: Resolve upstream release
@@ -33,6 +45,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           REQUESTED_TAG: ${{ inputs.release_tag }}
+          # Preserve version-based skipping on schedules; rebuild changed
+          # native builder code when pushed to main, or when manually forced.
+          FORCE_BUILD: ${{ github.event_name == 'push' || inputs.force }}
         run: bash scripts/resolve-release.sh
   build:
     needs: resolve
@@ -50,6 +65,8 @@ jobs:
           ref: ${{ needs.resolve.outputs.sha }}
           path: rclone
           persist-credentials: false
+      - name: Verify ELF gate regression tests
+        run: python3 -m unittest discover -s builder/scripts -p 'test_verify_aar.py' -v
       - uses: actions/setup-go@v5
         with:
           go-version-file: rclone/go.mod
@@ -130,12 +147,23 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
           RELEASE_SHA: ${{ needs.resolve.outputs.sha }}
+          FORCE_BUILD: ${{ needs.resolve.outputs.force }}
         run: |
           set -euo pipefail
           release="aar-$RELEASE_TAG"
+          (cd dist && sha256sum -c SHA256SUMS)
+          files=(dist/*.aar dist/SHA256SUMS dist/BUILD_INFO.txt dist/AAR_CONTENTS.txt dist/AAR_VERIFICATION.json)
+          for file in "${files[@]}"; do test -s "$file"; done
           if gh release view "$release" >/dev/null 2>&1; then
-            echo "Already published $release" >> "$GITHUB_STEP_SUMMARY"
+            if [[ "$FORCE_BUILD" != true ]]; then
+              echo "Already published $release" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            gh release upload "$release" "${files[@]}" --clobber
+            gh release edit "$release" --notes "Upstream: wiserain/rclone $RELEASE_TAG, commit $RELEASE_SHA. Rebuilt with ckReader stat/range JNI and 16 KiB ELF validation for all ABIs."
+            echo "Replaced AAR assets in $release" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          (cd dist && sha256sum -c SHA256SUMS)
-          gh release create "$release" dist/*.aar dist/SHA256SUMS dist/BUILD_INFO.txt dist/AAR_CONTENTS.txt             --title "Android AAR for wiserain/rclone $RELEASE_TAG"             --notes "Upstream: wiserain/rclone $RELEASE_TAG, commit $RELEASE_SHA"
+          gh release create "$release" "${files[@]}" \
+            --title "Android AAR for wiserain/rclone $RELEASE_TAG" \
+            --notes "Upstream: wiserain/rclone $RELEASE_TAG, commit $RELEASE_SHA. Includes ckReader stat/range JNI and 16 KiB ELF validation."
