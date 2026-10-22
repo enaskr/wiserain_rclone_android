@@ -23,6 +23,7 @@ on:
       - scripts/resolve-release.sh
       - scripts/ckreader_range.go
       - scripts/verify-aar.py
+      - scripts/test_verify_aar.py
 permissions:
   contents: read
 concurrency:
@@ -64,6 +65,8 @@ jobs:
           ref: ${{ needs.resolve.outputs.sha }}
           path: rclone
           persist-credentials: false
+      - name: Verify ELF gate regression tests
+        run: python3 -m unittest discover -s builder/scripts -p 'test_verify_aar.py' -v
       - uses: actions/setup-go@v5
         with:
           go-version-file: rclone/go.mod
