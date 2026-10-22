@@ -9,12 +9,12 @@ Twice-daily GitHub Actions release check and conditional Android AAR build from 
 - Manual: Actions -> Build wiserain/rclone Android AAR -> Run workflow. Supply an optional upstream release_tag; builds of an already-published tag are skipped unless force=true.
 - On source updates: a push to main touching the build scripts or workflow **rebuilds** the current upstream release with new ckReader bindings; the twice-daily scheduled runs still skip successfully published versions.
 - Source checkout: immutable commit SHA resolved from the published release tag.
-- Android: gomobile bind -target=android, minimum API 23, four ABI variants. The build injects ckReader's Go bindings before gomobile.
+- Android: gomobile bind -target=android, minimum API 23, normally producing four ABI variants. Only the **arm64-v8a** library is a required compatibility target; the build injects ckReader's Go bindings before gomobile.
 - Outputs: Android AAR, SHA256SUMS, BUILD_INFO.txt, AAR_CONTENTS.txt, and AAR_VERIFICATION.json in Actions artifacts and GitHub Releases (aar-<tag>).
 - Skip unchanged: scheduled runs compare the upstream release tag with the last successfully published AAR version. A GitHub Release only counts as successful if it contains an `.aar` asset. A manual run may override this with `force=true` to replace the existing release assets.
 - Retry failures: failed or interrupted builds create no successful AAR Release; the next scheduled run will retry the same upstream version.
 - Upstream/repository API errors abort version checking rather than triggering an unnecessary build.
-- Publishing: only after successful build, checksums, JNI method signatures, JNI native entry points (`JNI_OnLoad` or named `Java_*` exports), and **16 KiB ELF PT_LOAD alignment for all four ABIs** have been verified.
+- Publishing: only after successful build, checksums, shared Java JNI method signatures, and **arm64-v8a native JNI entry points and 16 KiB ELF PT_LOAD alignment** have been verified. Other ABIs may be present but are **not validated** and do not block release publishing.
 - ckReader bindings: `scripts/ckreader_range.go` is copied into the temporary upstream checkout before `gomobile bind`, exporting `rcloneStatSize` and `rcloneReadRange` without modifying the upstream repository.
 - Range reads: `rcloneReadRange(fsrc, remote, offset, count)` returns at most 2 MiB per call, and the backend must support ranged reads to avoid downloading the full file.
 - For an already-published release, use **Actions → Run workflow** with the desired `release_tag` and `force=true`. Successful validation is required before its assets are replaced.
