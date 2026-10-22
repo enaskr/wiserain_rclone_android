@@ -6,12 +6,10 @@ on:
         description: 'Optional upstream release tag'
         required: false
         type: string
-      force:
-        description: 'Rebuild already published release'
-        type: boolean
-        default: false
+  # GitHub cron is UTC; Asia/Seoul (UTC+9) has no daylight saving time.
   schedule:
-    - cron: '17 3 * * *'
+    - cron: '4 19 * * *' # 04:04 KST (next calendar day)
+    - cron: '12 3 * * *' # 12:12 KST
   push:
     branches: [main]
     paths: ['.github/workflows/build-aar.yml', 'scripts/**']
@@ -35,7 +33,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           REQUESTED_TAG: ${{ inputs.release_tag }}
-          FORCE_BUILD: ${{ inputs.force }}
         run: bash scripts/resolve-release.sh
   build:
     needs: resolve
