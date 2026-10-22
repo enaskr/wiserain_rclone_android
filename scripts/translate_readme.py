@@ -6,6 +6,7 @@ This is intentionally fail-closed: failures never commit broken translations.
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from pathlib import Path
 from typing import Callable
@@ -31,7 +32,12 @@ def translate_piece(part: str, translate: Callable[[str], str]) -> str:
     return part[:leading] + translated + (part[-trailing:] if trailing else "")
 
 
-def translate_markdown(text: str, translate: Callable[[str], str]) -> str:
+def translate_markdown(
+    text: str,
+    translate: Callable[[str], str],
+    overrides: dict[str, str] | None = None,
+) -> str:
+    overrides = overrides or {}
     output: list[str] = []
     fence: str | None = None
     for line in text.splitlines(keepends=True):
@@ -49,6 +55,9 @@ def translate_markdown(text: str, translate: Callable[[str], str]) -> str:
         if fence or not body.strip() or body.lstrip().startswith("<!--"):
             output.append(line)
             continue
+        if body in overrides:
+            output.append(overrides[body] + suffix)
+            continue
         prefix = PREFIX.match(body).group(1)
         remaining = body[len(prefix):]
         parts: list[str] = []
@@ -58,7 +67,10 @@ def translate_markdown(text: str, translate: Callable[[str], str]) -> str:
             parts.append(token.group(0))
             last = token.end()
         parts.append(translate_piece(remaining[last:], translate))
-        output.append(prefix + "".join(parts) + suffix)
+        translated_line = "".join(parts)
+        if PROTECTED.findall(remaining) != PROTECTED.findall(translated_line):
+            raise RuntimeError("An inline code or link token changed in automatic translation")
+        output.append(prefix + translated_line + suffix)
     if fence is not None:
         raise RuntimeError("Unclosed Markdown code fence")
     return "".join(output)
@@ -84,9 +96,19 @@ def offline_translator() -> Callable[[str], str]:
 
 def main() -> None:
     original = SOURCE.read_text(encoding="utf-8")
-    translated = translate_markdown(original, offline_translator())
-    if PROTECTED.findall(original) != PROTECTED.findall(translated):
-        raise RuntimeError("Inline code or links were changed by translation")
+    override_path = Path("scripts/readme_ko_overrides.json")
+    overrides = json.loads(override_path.read_text(encoding="utf-8"))
+    if not isinstance(overrides, dict):
+        raise ValueError("Korean README overrides must be a JSON dictionary")
+    # Only request a machine translation if a new or edited English line is
+    # not in the reviewed mapping. This avoids downgrading technical language.
+    from functools import lru_cache
+
+    @lru_cache(maxsize=1)
+    def engine():
+        return offline_translator()
+
+    translated = translate_markdown(original, lambda value: engine()(value), overrides)
     if original.count("```") != translated.count("```"):
         raise RuntimeError("Fenced code blocks were modified")
     if not re.search("[가-힣]", translated):
