@@ -61,13 +61,36 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
-      - name: Install Android NDK
+      # GitHub-hosted Ubuntu runners already include Android SDK command-line tools.
+      # Avoid android-actions/setup-android@v3, which tries to install the removed
+      # "tools" package and fails with "Failed to find package 'tools'".
+      - name: Configure Android SDK and NDK
+        shell: bash
         run: |
           set -euo pipefail
-          sdkmanager --install 'platforms;android-35' 'ndk;27.2.12479018'
-          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> "$GITHUB_ENV"
-          echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          if [[ -z "$sdk_root" || ! -d "$sdk_root" ]]; then
+            echo "::error::Android SDK not found on GitHub runner"
+            exit 1
+          fi
+          if ! command -v sdkmanager >/dev/null 2>&1; then
+            echo "::error::sdkmanager is not available on PATH"
+            exit 1
+          fi
+          echo "Using sdkmanager: $(command -v sdkmanager)"
+          # License command may return a nonzero status after all licenses are
+          # accepted; the subsequent install is the authoritative check.
+          yes | sdkmanager --sdk_root="$sdk_root" --licenses > /dev/null || true
+          sdkmanager --sdk_root="$sdk_root" --install 'platforms;android-35' 'ndk;27.2.12479018'
+          ndk="$sdk_root/ndk/27.2.12479018"
+          test -x "$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android23-clang"
+          {
+            echo "ANDROID_HOME=$sdk_root"
+            echo "ANDROID_SDK_ROOT=$sdk_root"
+            echo "ANDROID_NDK_HOME=$ndk"
+            echo "ANDROID_NDK_ROOT=$ndk"
+          } >> "$GITHUB_ENV"
+          echo "Android NDK: $ndk" >> "$GITHUB_STEP_SUMMARY"
       - name: Build and verify AAR
         working-directory: rclone
         env:
