@@ -73,15 +73,28 @@ jobs:
             echo "::error::Android SDK not found on GitHub runner"
             exit 1
           fi
-          if ! command -v sdkmanager >/dev/null 2>&1; then
-            echo "::error::sdkmanager is not available on PATH"
+          # The hosted image ships sdkmanager in cmdline-tools, but it is not
+          # necessarily on PATH until a separate setup action configures it.
+          sdkmanager_bin=""
+          for candidate in "$sdk_root/cmdline-tools/latest/bin/sdkmanager" \
+                           "$sdk_root"/cmdline-tools/*/bin/sdkmanager \
+                           "$sdk_root/tools/bin/sdkmanager"; do
+            if [[ -x "$candidate" ]]; then
+              sdkmanager_bin="$candidate"
+              break
+            fi
+          done
+          if [[ -z "$sdkmanager_bin" ]]; then
+            echo "::error::sdkmanager not found under $sdk_root"
+            ls -la "$sdk_root/cmdline-tools" || true
             exit 1
           fi
-          echo "Using sdkmanager: $(command -v sdkmanager)"
-          # License command may return a nonzero status after all licenses are
-          # accepted; the subsequent install is the authoritative check.
-          yes | sdkmanager --sdk_root="$sdk_root" --licenses > /dev/null || true
-          sdkmanager --sdk_root="$sdk_root" --install 'platforms;android-35' 'ndk;27.2.12479018'
+          echo "Using sdkmanager: $sdkmanager_bin"
+          echo "$(dirname "$sdkmanager_bin")" >> "$GITHUB_PATH"
+          # License command can get SIGPIPE from yes after its prompts finish.
+          # A subsequent install and NDK executable check validate success.
+          yes | "$sdkmanager_bin" --sdk_root="$sdk_root" --licenses >/dev/null || true
+          "$sdkmanager_bin" --sdk_root="$sdk_root" --install 'platforms;android-35' 'ndk;27.2.12479018'
           ndk="$sdk_root/ndk/27.2.12479018"
           test -x "$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android23-clang"
           {
