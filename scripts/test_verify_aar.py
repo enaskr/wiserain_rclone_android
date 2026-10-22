@@ -68,6 +68,16 @@ class Test16KiBAlignment(unittest.TestCase):
         )
         self.assertEqual(result["mode"], "JNI_OnLoad")
 
+    def test_non_utf8_symbol_table_text_keeps_ascii_exports(self):
+        exported = [
+            "Java_org_rclone_gomobile_Gomobile_" + method
+            for method in VERIFIER.REQUIRED_METHODS
+        ]
+        raw = b"\xffsymbol\xfe\n" + "\n".join(exported).encode("ascii")
+        decoded = raw.decode("utf-8", errors="replace")
+        result = VERIFIER.inspect_jni_exports(decoded, "x86")
+        self.assertEqual(result["mode"], "named_jni_exports")
+
     def test_missing_jni_export_rejected(self):
         with self.assertRaises(ValueError):
             VERIFIER.inspect_jni_exports(
