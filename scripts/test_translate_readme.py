@@ -20,6 +20,14 @@ class ReadmeTranslationTests(unittest.TestCase):
         self.assertEqual(PROTECTED.findall(source), PROTECTED.findall(output))
         self.assertIn("`gomobile`", output)
 
+    def test_reviewed_override_does_not_call_machine_translator(self):
+        source = "- Upstream release changes\n"
+        result = translate_markdown(
+            source, lambda _x: self.fail("Unexpected machine translation"),
+            {"- Upstream release changes": "- 원본 릴리스 변경\n".rstrip("\n")},
+        )
+        self.assertEqual(result, "- 원본 릴리스 변경\n")
+
     def test_empty_input(self):
         self.assertEqual(translate_markdown("", self.translate), "")
 
