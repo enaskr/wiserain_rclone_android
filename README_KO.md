@@ -1,4 +1,4 @@
-<!-- README.md의 검수된 한국어 번역본입니다. README.md 변경 시 GitHub Actions에서 자동 갱신됩니다. -->
+<!-- Auto-generated from README.md with Argos Translate. Source SHA-256: 9b160d4181526451ad9a10fb4782ec51d1da7202f029ccba84cd17c84184cdb4. -->
 
 # wiserain/rclone Android AAR 자동 빌더
 
