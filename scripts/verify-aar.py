@@ -87,8 +87,21 @@ def verify_java_bindings(jar_bytes: bytes, tmp: pathlib.Path) -> list[str]:
         raise ValueError(f"Missing Java/JNI binding methods: {', '.join(missing)}")
     if not re.search(r"\blong\s+rcloneStatSize\(java\.lang\.String,\s*java\.lang\.String\)", details):
         raise ValueError("rcloneStatSize JNI signature mismatch")
-    if not re.search(r"\bbyte\[\]\s+rcloneReadRange\(java\.lang\.String,\s*java\.lang\.String,\s*long,\s*int\)", details):
-        raise ValueError("rcloneReadRange JNI signature mismatch")
+    # gobind maps Go int to Java long on some architectures/versions.
+    # Check API shape while allowing either valid numeric count representation.
+    read_range_declarations = [
+        line.strip() for line in details.splitlines()
+        if "rcloneReadRange(" in line
+    ]
+    print("Java rcloneReadRange declaration:", read_range_declarations)
+    if not re.search(
+        r"\bbyte\[\]\s+rcloneReadRange\(java\.lang\.String,\s*java\.lang\.String,\s*long,\s*(?:int|long)\)",
+        details,
+    ):
+        raise ValueError(
+            "rcloneReadRange JNI signature mismatch: "
+            + "; ".join(read_range_declarations)
+        )
     return sorted(methods)
 
 
