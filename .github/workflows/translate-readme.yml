@@ -1,4 +1,5 @@
 name: Generate Korean README
+# Offline Argos translation runs in GitHub's own hosted Ubuntu VM.
 
 on:
   push:
@@ -18,15 +19,27 @@ concurrency:
 
 jobs:
   translate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
+      - name: Require GitHub-hosted Ubuntu runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_ACTIONS:-}" != true || "${RUNNER_ENVIRONMENT:-}" != github-hosted ||
+                "${RUNNER_OS:-}" != Linux || "${RUNNER_ARCH:-}" != X64 ]]; then
+            echo "::error::Only a GitHub-hosted Ubuntu x64 runner may run this job."
+            exit 1
+          fi
+          echo "Runner: $RUNNER_ENVIRONMENT / $RUNNER_OS / $RUNNER_ARCH" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@v4
         with:
           persist-credentials: true
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Audit CI runner and remote-build policy
+        run: python -m unittest discover -s scripts -p 'test_ci_environment.py' -v
       - name: Test Markdown translator
         run: python -m unittest discover -s scripts -p 'test_translate_readme.py' -v
       - name: Determine whether a new line needs automatic translation
