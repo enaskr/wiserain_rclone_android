@@ -54,3 +54,18 @@ BUILD_INFO.txt에는 실행한 GitHub Actions run ID와 runner 종류·OS·아�
 - runner 이미지 근거: https://docs.github.com/en/actions/reference/runners/github-hosted-runners
 
 GitHub 예약 실행은 지정 시간보다 지연될 수 있습니다.
+
+
+## 실환경 검증 결과 (2026-10-26)
+
+- 변경 사항: https://github.com/enaskr/wiserain_rclone_android/pull/10 (main 병합 완료)
+- AAR 빌드·배포: https://github.com/enaskr/wiserain_rclone_android/actions/runs/40301125717 (resolve/build/publish 모두 성공)
+- 번역: https://github.com/enaskr/wiserain_rclone_android/actions/runs/40301125649 (translate 성공)
+- 정책 테스트: 4개 통과; 기존 ARM64 ELF·JNI 테스트: 10개 통과; 번역 구조 테스트: 6개 통과
+- arm64-v8a JNI: named_jni_exports 확인; ELF PT_LOAD 세그먼트 4개 모두 16,384바이트 정렬 확인
+- AAR SHA256SUMS 검증: 통과
+- 최종 GitHub Release: https://github.com/enaskr/wiserain_rclone_android/releases/tag/aar-v1.75.2-338
+- 최종 배포 AAR: rclone-v1.75.2-338-android.aar (122,211,406바이트)
+- GitHub Release 자산 갱신 확인: 2026-10-26 09:42 UTC
+
+모든 작업 로그에서 GitHub-hosted ubuntu-24.04를 확인했습니다. 실물 Android 기기에서의 동작까지 검증했다는 의미는 아닙니다.
