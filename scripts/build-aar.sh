@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Only GitHub-hosted Linux x64 Actions runners may produce published AARs.
+# External self-hosted build servers, including NAS/SSH agents, are rejected.
+if [[ "${GITHUB_ACTIONS:-}" != true || "${RUNNER_ENVIRONMENT:-}" != github-hosted ||
+      "${RUNNER_OS:-}" != Linux || "${RUNNER_ARCH:-}" != X64 ]]; then
+  echo "::error::This release builder requires a GitHub-hosted Ubuntu x64 Actions runner." >&2
+  exit 1
+fi
+: "${GITHUB_RUN_ID:?}"
 : "${RELEASE_TAG:?}"
 : "${RELEASE_SHA:?}"
 
@@ -46,13 +54,15 @@ grep -Fxq "jni/arm64-v8a/libgojni.so" dist/AAR_CONTENTS.txt || {
 python3 ../builder/scripts/verify-aar.py "$output" dist/AAR_VERIFICATION.json
 
 (cd dist && sha256sum "$(basename "$output")" > SHA256SUMS && sha256sum -c SHA256SUMS)
-printf 'upstream=wiserain/rclone\ntag=%s\ncommit=%s\nbindings=ckreader-stat-range\npage_alignment=16384\nverification_abi=arm64-v8a\n' \
-  "$RELEASE_TAG" "$RELEASE_SHA" > dist/BUILD_INFO.txt
+printf 'upstream=wiserain/rclone\ntag=%s\ncommit=%s\nbindings=ckreader-stat-range\npage_alignment=16384\nverification_abi=arm64-v8a\nrunner_environment=%s\nrunner_os=%s\nrunner_arch=%s\ngithub_actions_run_id=%s\n' \
+  "$RELEASE_TAG" "$RELEASE_SHA" "$RUNNER_ENVIRONMENT" "$RUNNER_OS" "$RUNNER_ARCH" "$GITHUB_RUN_ID" > dist/BUILD_INFO.txt
 {
   echo "## ckReader-compatible Android AAR"
   echo "- Upstream version: $RELEASE_TAG"
   echo "- Source commit: $RELEASE_SHA"
   echo "- JNI and 16 KiB ELF checks: PASS (arm64-v8a only)"
   echo "- Other ABIs: not compatibility-verified"
+  echo "- Build runner: $RUNNER_ENVIRONMENT / $RUNNER_OS / $RUNNER_ARCH"
+  echo "- GitHub Actions run: $GITHUB_RUN_ID"
   cat dist/SHA256SUMS
 } >> "$GITHUB_STEP_SUMMARY"
