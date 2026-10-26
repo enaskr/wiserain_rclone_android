@@ -1,4 +1,5 @@
 name: Build wiserain/rclone Android AAR
+# All jobs use GitHub's own ubuntu-24.04 hosted VMs. No external builders.
 on:
   workflow_dispatch:
     inputs:
@@ -31,14 +32,26 @@ concurrency:
   cancel-in-progress: false
 jobs:
   resolve:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       tag: ${{ steps.resolve.outputs.tag }}
       sha: ${{ steps.resolve.outputs.sha }}
       build: ${{ steps.resolve.outputs.build }}
       force: ${{ steps.resolve.outputs.force }}
     steps:
+      - name: Require GitHub-hosted Ubuntu runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_ACTIONS:-}" != true || "${RUNNER_ENVIRONMENT:-}" != github-hosted ||
+                "${RUNNER_OS:-}" != Linux || "${RUNNER_ARCH:-}" != X64 ]]; then
+            echo "::error::Only a GitHub-hosted Ubuntu x64 runner may run this job."
+            exit 1
+          fi
+          echo "Runner: $RUNNER_ENVIRONMENT / $RUNNER_OS / $RUNNER_ARCH" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@v4
+      - name: Audit CI runner and remote-build policy
+        run: python3 -m unittest discover -s scripts -p 'test_ci_environment.py' -v
       - name: Resolve upstream release
         id: resolve
         env:
@@ -52,9 +65,19 @@ jobs:
   build:
     needs: resolve
     if: needs.resolve.outputs.build == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
+      - name: Require GitHub-hosted Ubuntu runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_ACTIONS:-}" != true || "${RUNNER_ENVIRONMENT:-}" != github-hosted ||
+                "${RUNNER_OS:-}" != Linux || "${RUNNER_ARCH:-}" != X64 ]]; then
+            echo "::error::Only a GitHub-hosted Ubuntu x64 runner may run this job."
+            exit 1
+          fi
+          echo "Runner: $RUNNER_ENVIRONMENT / $RUNNER_OS / $RUNNER_ARCH" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@v4
         with:
           path: builder
@@ -133,10 +156,20 @@ jobs:
   publish:
     needs: [resolve, build]
     if: needs.resolve.outputs.build == 'true' && needs.build.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
+      - name: Require GitHub-hosted Ubuntu runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_ACTIONS:-}" != true || "${RUNNER_ENVIRONMENT:-}" != github-hosted ||
+                "${RUNNER_OS:-}" != Linux || "${RUNNER_ARCH:-}" != X64 ]]; then
+            echo "::error::Only a GitHub-hosted Ubuntu x64 runner may run this job."
+            exit 1
+          fi
+          echo "Runner: $RUNNER_ENVIRONMENT / $RUNNER_OS / $RUNNER_ARCH" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/download-artifact@v4
         with:
           name: rclone-${{ needs.resolve.outputs.tag }}-android-aar
@@ -152,6 +185,10 @@ jobs:
           set -euo pipefail
           release="aar-$RELEASE_TAG"
           (cd dist && sha256sum -c SHA256SUMS)
+          # Only release artifacts attested by GitHub-hosted Linux/x64 CI.
+          grep -Fxq 'runner_environment=github-hosted' dist/BUILD_INFO.txt
+          grep -Fxq 'runner_os=Linux' dist/BUILD_INFO.txt
+          grep -Fxq 'runner_arch=X64' dist/BUILD_INFO.txt
           files=(dist/*.aar dist/SHA256SUMS dist/BUILD_INFO.txt dist/AAR_CONTENTS.txt dist/AAR_VERIFICATION.json)
           for file in "${files[@]}"; do test -s "$file"; done
           if gh release view "$release" >/dev/null 2>&1; then
